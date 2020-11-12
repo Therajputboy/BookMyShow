@@ -1,0 +1,134 @@
+#%RAML 1.0
+title: bookmyshow
+version: 1.0
+
+types: 
+  movies: !include dataTypes/movies_datatype.raml
+  theatre: !include dataTypes/theatre_datatype.raml
+  payment: !include dataTypes/payment.raml
+  paymentStatus: !include dataTypes/paymentStatus.raml
+  eTicket: !include dataTypes/eticket_datatype.raml
+  bulkbooking: !include /dataTypes/bulkbookinginput.raml
+
+traits:
+  credentials-required:
+    headers:
+      username:
+        type: string
+      password:
+        type: string
+    responses:
+      401:
+        description: Unauthorized !!!. Client_id and Client_Secret are invalid.
+      429:
+        description: Quota exceeded for the current session
+      503:
+        description: Information Unreacheable
+
+/movies:
+  get:
+    displayName: Get Movies
+    queryParameters:
+      city:
+        description: City Name
+        type: string
+        required: true
+        enum:
+          - Mumbai
+          - Bangalore
+          - Chandigarh
+          - Hyderabad
+          - Chennai
+          - NCR
+      movieName:
+        displayName: Movie Name
+        type: string
+        required: false
+      movieDate:
+        description: Movie Date
+        type: date-only
+        required: false
+    responses:
+      200:
+        body:
+          application/json:
+            type: movies[]
+            examples:
+              output: !include examples/movies.raml
+
+  /{movieId}:
+    get:
+      responses:
+        200:
+          body:
+            application/json:
+              type: movies[]
+              examples:
+                output: !include /examples/movie_example.raml    
+    /bookTicket:
+      is: [credentials-required]
+      get:
+        queryParameters:
+          movieId:
+            description: Chosen movie for booking ticket
+            type: string
+            required: true
+        responses:
+          200:
+            body:
+              application/json:
+                type: theatre[]
+                examples:
+                  output: !include /examples/theatre.raml                 
+
+      /bulkbooking:
+        is: [credentials-required]
+        post:
+          body:
+            application/json:
+              type: bulkbooking[]
+              examples:
+                input: !include /examples/bulkbookinginputexample.raml
+          responses:
+            201:
+              body:
+                application/json:
+                  example:
+                    output: !include /examples/payment_input.raml
+                       
+                              
+      /payment:
+        post:
+          body:
+            application/json:
+              type: payment[]
+              examples:
+                input: !include examples/payment_input.raml
+          responses:
+            201:
+              body:
+                application/json:
+                  example:
+                    message: Payment Success                  
+/orderInvoice:
+  is: [credentials-required]
+  get:
+    responses:
+      200:
+        body:
+          application/json:
+            type: paymentStatus[]
+            examples:
+              output: !include examples/paymentStatus.raml
+
+/eTicket:
+    is: [credentials-required]
+    get:
+      responses:
+        200:
+          body:
+            application/json:
+              type: eTicket[]
+              examples:
+                output: !include examples/eTicket_example.raml
+ 

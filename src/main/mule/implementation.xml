@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd">
+	<db:config name="Database_Config" doc:name="Database Config" doc:id="03bbeb20-f2d9-4522-bb0a-cf7da068f478" >
+		<db:my-sql-connection host="localhost" port="3306" user="root" database="bookmyshow" />
+	</db:config>
+	<http:request-config name="HTTP_Request_configuration" doc:name="HTTP Request configuration" doc:id="c7379df3-d0ec-4873-a4e3-40e999fdae9d" >
+		<http:request-connection host="localhost" port="8081" />
+	</http:request-config>
+	<flow name="getMovies" doc:id="3a5616db-5fa1-448e-ad25-83e0bf367f29" >
+		<db:select doc:name="Select" doc:id="16b20e96-591b-43fa-b1ef-ce426909213d" config-ref="Database_Config">
+			<db:sql ><![CDATA[select m.*,c.cityName from
+movies as m inner join city as c 
+on m.cityId = c.cityId 
+where
+c.cityName = :cityId]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{"cityId": attributes.queryParams.city}]]]></db:input-parameters>
+		</db:select>
+		<ee:transform doc:name="Transform Message" doc:id="c235e7d2-add1-4ad0-8324-88043ef41faa" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="da7fb011-97b1-4ed6-9e1c-ae20d6d6fd4e" message="#[payload]"/>
+	</flow>
+	<flow name="getMovieById" doc:id="272ed3fc-a704-4bd8-a14a-b7442e953bc7" >
+		<db:select doc:name="getMovieById" doc:id="a6b037b7-54b4-4a98-8b3e-783ebcbd7821" config-ref="Database_Config">
+			<db:sql ><![CDATA[select m.*,c.cityName from
+movies as m inner join city as c 
+on m.cityId = c.cityId 
+where
+c.cityName = :cityName
+and m.movieId = :movieId]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{"movieId":attributes.uriParams.movieId,"cityName":attributes.queryParams.city}]]]></db:input-parameters>
+		</db:select>
+		<ee:transform doc:name="Transform Message" doc:id="674540c9-951c-49d3-a056-88328a10440a" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="df689c76-01a4-4ef8-a456-8f10c7d005ff" message="#[payload]"/>
+	</flow>
+	<flow name="bookTicketFlow" doc:id="6a052d36-de9c-48ec-b2f1-0d966a37cb90" >
+		<db:select doc:name="Select" doc:id="0b5a78c0-a441-4da1-b6ee-1c92bfecf888" config-ref="Database_Config">
+			<db:sql ><![CDATA[select c.cityName,m.movieName,m.movieDescription,m.Language,m.RunningLength,m.ratings,m.genre,
+t.theatreName,s.schedule,s.availableSeats,s.price
+from movies as m inner join city as c
+on m.cityId = c.cityId 
+inner join theatre as t on
+c.cityId = t.cityId 
+inner join showtimings as s
+on s.theatreId = t.theatreId
+where c.cityName = :city]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{"movieId":message.attributes.uriParams.movieId,"city":attributes.queryParams.city
+}]]]></db:input-parameters>
+		</db:select>
+		<ee:transform doc:name="Transform Message" doc:id="51afe1c2-694f-4fd5-884a-6f26a5975aa0" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="b22c415d-6530-4531-b04f-94f345acbda5" message="#[payload]"/>
+	</flow>
+	<flow name="bulkBookingFlow" doc:id="f747a8d8-df0a-4f1d-9589-59fd1d4c41d5" >
+		<logger level="INFO" doc:name="Logger" doc:id="0bddc79d-653b-4e7d-aea6-eb7cb088c20b" message="#[payload]"/>
+	</flow>
+	<flow name="paymentFlow" doc:id="63141904-5e6d-4058-9fca-c223a1a0b6fb" >
+		<set-variable value="#[25]" doc:name="numberoftickets" doc:id="eb1887c4-f119-4c2a-9fa5-2422a199345f" variableName="numberoftickets"/>
+		<choice doc:name="Choice" doc:id="c65c373f-eae2-483f-910b-4ef964e7f8cc" >
+			<when expression="#[payload.numberoftickets &gt; vars.numberoftickets]">
+				<http:request method="POST" doc:name="Request" doc:id="8d291727-136a-4082-839d-5671a29ff706" config-ref="HTTP_Request_configuration" path="/bulkbooking">
+					<http:query-params ><![CDATA[#[output application/java
+---
+{
+	"Key" : "Value"
+}]]]></http:query-params>
+				</http:request>
+			</when>
+		</choice>
+		<logger level="INFO" doc:name="Logger" doc:id="76430cc2-42d1-4aa9-be2e-2f26d334d38d" message="Payment Done"/>
+	</flow>
+	<flow name="implementationFlow" doc:id="becda2e5-de25-4206-9d3c-a9d9d2877054" initialState="stopped">
+		<http:listener doc:name="Listener" doc:id="ea6e76e1-42a6-4b5b-9f37-3cd23f7f49a3" config-ref="bookmyshow-httpListenerConfig" path="/test"/>
+		<db:insert doc:name="Insert" doc:id="e6369eab-c091-47b9-9990-3a85fa444d92" config-ref="Database_Config">
+			<db:sql><![CDATA[insert into payments (numberOfTickets,grossAmount,totalAmount,discountAmount,paymentMethod)
+values(:numberOfTickets,1400,:totalAmount,150,:paymentMethod)]]></db:sql>
+			<db:input-parameters><![CDATA[#[{"numberOfTickets":5,"totalAmount":1250,"paymentMethod":"Wallet"}]]]></db:input-parameters>
+		</db:insert>
+		<db:select doc:name="Select" doc:id="8e579dc0-dd8c-4c8e-9cfd-7e46331a2925" config-ref="Database_Config">
+			<db:sql><![CDATA[select min(discountPercentage) from bulkdiscount
+where numberOfTickets < :tickets]]></db:sql>
+			<db:input-parameters><![CDATA[#[{"tickets": payload.numberOfTickets}]]]></db:input-parameters>
+		</db:select>
+	</flow>
+	<flow name="getETicket" doc:id="67dd5d9b-185f-42f1-983c-a0b81317cb7b" >
+		<db:select doc:name="Select" doc:id="1cd58d1d-c2e8-4973-b844-3a1b63bdc7e3" config-ref="Database_Config">
+			<db:sql ><![CDATA[select m.movieName,b.schedule,b.screenNumber,b.seatNumbers,
+b.orderId,t.theatreName
+ from movies as m inner join bookings as b on
+ m.movieId = b.movieId
+ inner join theatre as t on
+ t.theatreId = b.theatreId]]></db:sql>
+		</db:select>
+		<ee:transform doc:name="Transform Message" doc:id="9f1c4018-01ab-438f-9a67-ce8fd3bf1c97" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="e0060111-94b2-41b2-99c2-d74e5bc88b31" message="#[payload]"/>
+	</flow>
+</mule>
